@@ -1,0 +1,27 @@
+Global:
+  model : Transformer
+  data_path: "./data/"
+  result_path: "./results/"
+  start_year: 2014
+  end_year: 2025
+  features: 6
+  time_steps: 72
+  pred_steps: 24
+  batch_size: 16
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  experiment_rounds : 3
+
+  device : auto
+  dropout: 0.1
+  learning_rate: 0.0001
+  epochs: 100
+  max_grad_norm: 1.0
+
+Transformer:
+  enc_layers: 6
+  dec_layers: 6
+  model_dim: 512
+  num_heads: 8
+  head_dim: 64
