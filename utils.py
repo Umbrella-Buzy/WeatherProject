@@ -107,3 +107,4 @@ class WeatherDataset(Dataset):
         label = torch.tensor(self.labels[idx], dtype=torch.float32).permute(0, 2, 3, 1)
         return data, label
 
+

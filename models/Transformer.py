@@ -113,6 +113,7 @@ class Transformer(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        self.mask = torch.tril(torch.ones(config['pred_steps'], config['time_steps'])).bool()
         self.enc_input_proj = nn.Linear(config['features'], config['model_dim'])
         self.dec_input_proj = nn.Linear(config['features'], config['model_dim'])
         self.pos_encoder = PositionalEncoding(config['model_dim'], config['dropout'])
@@ -123,6 +124,7 @@ class Transformer(nn.Module):
                         for _ in range(config['dec_layers'])])
 
     def forward(self, x, tgt, mask=None):
+        casual_mask = self.mask if mask is None else mask
         x = self.enc_input_proj(x)
         out = self.dec_input_proj(tgt)
         x = self.pos_encoder(x)
@@ -130,15 +132,15 @@ class Transformer(nn.Module):
         for encoder_block in self.encoder:
             x = encoder_block(x)
         for decoder_block in self.decoder:
-            out = decoder_block(out, x, mask)
-        out = self.output_proj(x)
+            out = decoder_block(out, x, casual_mask)
+        out = self.output_proj(out)
         return out
 
 from utils import Config
 config = Config("../config/config.yml")
 
 model = Transformer(config)
-x = torch.randn(1, 6, 6)
-context = torch.randn(1, 8, 6)
+x = torch.randn(1, 72, 6)
+context = torch.randn(1, 24, 6)
 y = model(x, context)
 print(y)

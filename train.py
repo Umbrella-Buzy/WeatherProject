@@ -58,7 +58,6 @@ def train_model(config):
     val_losses = []
     print(f"begin training on {config["device"]}...")
     for epoch in range(config["epochs"]):
-        # 训练阶段
         model.train()
         train_loss = 0.0
         for batch_data, batch_label in train_loader:

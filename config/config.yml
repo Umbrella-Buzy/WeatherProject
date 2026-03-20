@@ -20,6 +20,7 @@ Global:
   max_grad_norm: 1.0
 
 Transformer:
+  pre_processing: time_space_emb
   enc_layers: 6
   dec_layers: 6
   model_dim: 512
