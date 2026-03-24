@@ -6,7 +6,7 @@ cities = ["Beijing", "Chengdu", "Guangzhou", "Shanghai", "Tianjin", "Chongqing"]
 station_nums = [20, 11, 20, 17, 19, 23]
 #station_nums = [20]
 #cities = ["Beijing"]
-required_traits = (["经度", "维度", "年份", "月份", "日期", "小时", "AQI",
+required_traits = (["经度", "维度", "年份", "月份", "日期", "小时",
                     "PM2.5_AQI", "PM10_AQI", "SO2_AQI", "NO2_AQI", "O3_AQI", "CO_AQI"])
 
 for city, station_num in zip(cities, station_nums):
