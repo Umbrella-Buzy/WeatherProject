@@ -10,7 +10,7 @@ import torch.nn as nn
 
 def get_correct(pred_data, real_data):
     abs_diff = torch.abs(pred_data - real_data)
-    is_correct = (abs_diff < 15).all(dim=2)
+    is_correct = (abs_diff < 5).all(dim=2)
     correct_counts = is_correct.sum(dim=0)
     return correct_counts.tolist()
 
@@ -65,11 +65,18 @@ class WeatherDataset(Dataset):
                     dec_inputs.append(dec[j])
                     labels.append(label[j])
 
+        '''
         train_split = int(len(samples) * self.config["train_ratio"])
         if self.mode == "train":
             return samples[:train_split], dec_inputs[:train_split], labels[:train_split]
         else:
             return samples[train_split:], dec_inputs[train_split:], labels[train_split:]
+        '''
+        train_split = int(len(samples) * 0.05)
+        if self.mode == "train":
+            return samples[:train_split], dec_inputs[:train_split], labels[:train_split]
+        else:
+            return samples[-train_split:], dec_inputs[-train_split:], labels[-train_split:]
 
     def __len__(self):
         return len(self.data)

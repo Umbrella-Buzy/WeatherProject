@@ -122,6 +122,8 @@ def train_and_test_model(config):
     full_test_results = pd.concat([full_test_results, informations],ignore_index=True)
     print(full_test_results)
     full_test_results.to_csv(test_result_path, index=False)
+    with open(os.path.join(result_path, "accuracy.txt"),'w') as f:
+        f.write(str(accuracy))
     return test_loss, total_accuracy
 
 
