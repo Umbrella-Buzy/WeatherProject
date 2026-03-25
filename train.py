@@ -8,65 +8,48 @@ import os
 from tqdm import tqdm
 import time
 from models.Transformer import Transformer
-from utils import *
-import seaborn as sns
+from utils.config import Config
+from utils.data_process import *
+from utils.training_utils import *
 import matplotlib.pyplot as plt
 
 config = Config("./config/config.yml")
 
 # ===================== 数据读取与预处理=====================
 # 构建数据集和数据加载器
-train_dataset = WeatherDataset(config, mode="train")
-#val_dataset = WeatherDataset(config, mode="val")
-test_dataset = WeatherDataset(config, mode="test")
+trainer = DistributedTrainer(config)
+device = trainer.get_device()
 
-train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True, drop_last=True)
-#val_loader = DataLoader(val_dataset, batch_size=config["batch_size"], shuffle=False)
-test_loader = DataLoader(test_dataset, batch_size=config["batch_size"], shuffle=False)
+train_dataset = WeatherDataset(config, mode="train")
+test_dataset = WeatherDataset(config, mode="test")
+print(f'loading training data...')
+train_loader = trainer.get_dataloader(train_dataset, batch_size=config["batch_size"], shuffle=True, drop_last=True)
+print(f'loading test data...')
+test_loader = trainer.get_dataloader(test_dataset, batch_size=config["batch_size"], shuffle=False, drop_last=False)
+
 # ===================== 模型训练与评估（匹配文档损失函数和优化器）=====================
 def train_and_test_model(config):
     # 初始化模型、损失函数、优化器
-    if config['model'] == 'Transformer':
-        model = Transformer(config).to(config['device'])
-    else:
-        print('invalid model')
-        return None, None, None
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=config["learning_rate"])
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5)
-    result_path = os.path.join(config["result_path"], f'{config["model"]}/')
-    if not os.path.exists(result_path):
-        os.makedirs(result_path)
-    test_result_path = os.path.join(result_path, "test_results.csv")
-    if not os.path.exists(test_result_path):
-        full_test_results = pd.DataFrame(columns=(list(config.get_all_keys())+
-                                                  ['param_sum','ave_runtime', 'best_val_loss','test_loss']))
-        test_id = 0
-    else:
-        full_test_results = pd.read_csv(test_result_path)
-        test_id = full_test_results.shape[0]
-    result_path = os.path.join(result_path, f'test_{test_id}/')
-    if not os.path.exists(result_path):
-        os.makedirs(result_path)
-
-    best_train_loss = float('inf')
+    optimizer = optim.Adam(trainer.model.parameters(), lr=config["learning_rate"])
+    full_test_results, test_id, result_path, test_result_path = init_results(config)
 
     train_losses = []
-    val_losses = []
-    print(f"begin training on {config["device"]}...")
+    best_train_loss = float('inf')
+    print(f"begin training on {device}...")
     for epoch in range(config["epochs"]):
-        model.train()
+        trainer.model.train()
         train_loss = 0.0
         for batch_data, batch_dec_input, batch_label in tqdm(train_loader):
-            batch_data = batch_data.to(config["device"])
-            batch_dec_input = batch_dec_input.to(config["device"])
-            batch_label = batch_label.to(config["device"])
+            batch_data = batch_data.to(device)
+            batch_dec_input = batch_dec_input.to(device)
+            batch_label = batch_label.to(device)
 
             optimizer.zero_grad()
-            pred = model(batch_data, batch_dec_input)
+            pred = trainer.model(batch_data, batch_dec_input)
             loss = criterion(pred, batch_label)
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), config["max_grad_norm"])
+            torch.nn.utils.clip_grad_norm_(trainer.model.parameters(), config["max_grad_norm"])
             optimizer.step()
 
             train_loss += loss.item() * batch_data.shape[0]
@@ -75,8 +58,8 @@ def train_and_test_model(config):
         train_losses.append(train_loss)
         print(f"epoch {epoch} train loss: {train_loss}")
         if epoch % config["save_epochs"] == 0:
-            torch.save(model.state_dict(), os.path.join(result_path, f'best_model.pth'))
-    torch.save(model.state_dict(), os.path.join(result_path, f'best_model.pth'))
+            trainer.save_model(os.path.join(result_path, f'best_model.pth'))
+    trainer.save_model(os.path.join(result_path, f'best_model.pth'))
 
     plt.title = 'train loss'
     plt.xlabel('epoch')
@@ -90,16 +73,16 @@ def train_and_test_model(config):
         f.write(str(train_losses))
 
     # 测试阶段
-    model.load_state_dict(torch.load(os.path.join(result_path, "best_model.pth")))
-    model.eval()
+    trainer.load_model(os.path.join(result_path, "best_model.pth"))
+    trainer.model.eval()
     test_loss = 0
     times = 0
     correct_counts = [0] * config['pred_steps']
     for batch_data, _, batch_label in tqdm(test_loader):
         start_time = time.time()
-        batch_data = batch_data.to(config["device"])
-        batch_label = batch_label.to(config["device"])
-        pred = model.generate(batch_data)
+        batch_data = batch_data.to(device)
+        batch_label = batch_label.to(device)
+        pred = trainer.model.generate(batch_data)
         loss = criterion(pred, batch_label)
         correct_counts = [s+c for s,c in zip(correct_counts, get_correct(pred, batch_label))]
         test_loss += loss.item() * batch_data.shape[0]
@@ -114,7 +97,7 @@ def train_and_test_model(config):
     print(f"test loss：{test_loss:.6f}")
     print(accuracy)
     print(f"total accuracy {total_accuracy}")
-    total_params = sum(p.numel() for p in model.parameters())
+    total_params = sum(p.numel() for p in trainer.model.parameters())
     ave_runtime = times / len(test_loader.dataset)
     informations = config.get_all_values() + [total_params, ave_runtime, best_train_loss, test_loss, total_accuracy]
     informations = pd.DataFrame([informations], columns=(list(config.get_all_keys())+

@@ -49,3 +49,19 @@ class Attention(nn.Module):
         attn_out = torch.matmul(attn, v).transpose(1, 2).contiguous().view(B, T_q, -1)
         attn_out =self.projection(attn_out)
         return attn_out
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, model_dim, dropout=0.1, max_len=200):
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+        position = torch.arange(0, max_len, dtype=torch.float32).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, model_dim, 2).float() * (-math.log(10000.0) / model_dim))
+        pe = torch.zeros(max_len, model_dim)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:, :x.size(1), :]
+        return self.dropout(x)

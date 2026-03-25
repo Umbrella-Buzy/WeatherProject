@@ -1,12 +1,4 @@
-import torch
-import torch.nn as nn
-import math
-import torch.optim as optim
-from models.basic_structures import FFN, Attention
-from utils import PositionalEncoding, WeatherDataset
-from torch.utils.data import Dataset, DataLoader
-from tqdm import tqdm
-import numpy as np
+from models.basic_structures import *
 
 class EncoderBlock(nn.Module):
     def __init__(self, model_dim, num_heads=8, head_dim=64, dropout=0.1):

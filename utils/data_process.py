@@ -1,45 +1,10 @@
-import yaml
 import torch
 import numpy as np
-import pandas as pd
 import math
 import calendar
 from torch.utils.data import Dataset
 import os
 import torch.nn as nn
-
-def get_correct(pred_data, real_data):
-    abs_diff = torch.abs(pred_data - real_data)
-    is_correct = (abs_diff < 5).all(dim=2)
-    correct_counts = is_correct.sum(dim=0)
-    return correct_counts.tolist()
-
-class Config:
-    def __init__(self, config_file):
-        with open(config_file, 'r') as file:
-            self.params = yaml.safe_load(file)
-        self.model = self.params['Global']['model']
-
-    def __getitem__(self, key):
-        if key == 'device' and self.params['Global'][key] == 'auto':
-            return 'cuda' if torch.cuda.is_available() else 'cpu'
-        if key in self.params[self.model]:
-            return self.params[self.model][key]
-        else:
-            return self.params['Global'][key]
-
-    def __setitem__(self, key, value):
-        self.params[self.model][key] = value
-        self.__setattr__(key, value)
-
-    def __contains__(self, key):
-        return key in self.params[self.model]
-
-    def get_all_keys(self):
-        return (list(self.params['Global'].keys()) + list(self.params[self.model].keys()))
-
-    def get_all_values(self):
-        return [self[key] for key in self.get_all_keys()]
 
 class WeatherDataset(Dataset):
     def __init__(self, config, mode="train"):
@@ -48,7 +13,6 @@ class WeatherDataset(Dataset):
         self.data, self.dec_input, self.labels= self.load_data()
 
     def load_data(self):
-        print(f"loading {self.mode} data...")
         cities = ["Beijing", "Chengdu", "Guangzhou", "Shanghai", "Tianjin", "Chongqing"]
         samples = []
         labels = []
@@ -87,22 +51,6 @@ class WeatherDataset(Dataset):
         label = torch.tensor(self.labels[idx], dtype=torch.float32)
         return data, dec_inputs, label
 
-class PositionalEncoding(nn.Module):
-    def __init__(self, model_dim, dropout=0.1, max_len=200):
-        super().__init__()
-        self.dropout = nn.Dropout(dropout)
-        position = torch.arange(0, max_len, dtype=torch.float32).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, model_dim, 2).float() * (-math.log(10000.0) / model_dim))
-        pe = torch.zeros(max_len, model_dim)
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        x = x + self.pe[:, :x.size(1), :]
-        return self.dropout(x)
-
 class Preprocessor(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -126,10 +74,8 @@ class Preprocessor(nn.Module):
             days_in_month = calendar.monthrange(year, int(month))[1]
             days.append(days_in_month)
 
-'''
-ds = WeatherDataset(config=Config("./config/config.yml"))
-data, dec, lab = ds[0]
-print(data.shape)
-print(dec.shape)
-print(lab.shape)
-'''
+def get_correct(pred_data, real_data):
+    abs_diff = torch.abs(pred_data - real_data)
+    is_correct = (abs_diff < 5).all(dim=2)
+    correct_counts = is_correct.sum(dim=0)
+    return correct_counts.tolist()
