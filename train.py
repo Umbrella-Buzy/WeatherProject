@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import pandas as pd
+from sympy.physics.units import momentum
 from torch.utils.data import Dataset, DataLoader
 import os
 from tqdm import tqdm
@@ -15,6 +16,7 @@ import matplotlib.pyplot as plt
 
 #os.environ['MASTER_ADDR'] = 'localhost'
 #os.environ['MASTER_PORT'] = '8800'
+os.environ["USE_LIBUV"] = "0"
 config = Config("./config/config.yml")
 
 # ===================== 数据读取与预处理=====================
@@ -24,25 +26,30 @@ device = trainer.get_device()
 
 train_dataset = WeatherDataset(config, mode="train")
 test_dataset = WeatherDataset(config, mode="test")
-print(f'loading training data...')
+if trainer.is_main_process():
+    print(f'loading training data...')
 train_loader = trainer.get_dataloader(train_dataset, batch_size=config["batch_size"], shuffle=True, drop_last=True)
-print(f'loading test data...')
+if trainer.is_main_process():
+    print(f'loading test data...')
 test_loader = trainer.get_dataloader(test_dataset, batch_size=config["batch_size"], shuffle=False, drop_last=False)
 
 # ===================== 模型训练与评估（匹配文档损失函数和优化器）=====================
 def train_and_test_model(config):
     # 初始化模型、损失函数、优化器
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(trainer.model.parameters(), lr=config["learning_rate"])
+    optimizer = optim.Adam(trainer.model.parameters(), lr=config["learning_rate"], weight_decay=config["weight_decay"])
     full_test_results, test_id, result_path, test_result_path = init_results(config)
 
     train_losses = []
     best_train_loss = float('inf')
-    print(f"begin training on {device}...")
+    if trainer.is_main_process():
+        print(f"begin training on {device}...")
     for epoch in range(config["epochs"]):
         trainer.model.train()
         train_loss = 0.0
-        for batch_data, batch_dec_input, batch_label in tqdm(train_loader):
+        if trainer.is_main_process():
+            train_loader = tqdm(train_loader)
+        for batch_data, batch_dec_input, batch_label in train_loader:
             batch_data = batch_data.to(device)
             batch_dec_input = batch_dec_input.to(device)
             batch_label = batch_label.to(device)
@@ -51,6 +58,8 @@ def train_and_test_model(config):
             pred = trainer.model(batch_data, batch_dec_input)
             loss = criterion(pred, batch_label)
             loss.backward()
+            loss = trainer.reduce_loss(loss)
+
             torch.nn.utils.clip_grad_norm_(trainer.model.parameters(), config["max_grad_norm"])
             optimizer.step()
 
@@ -60,7 +69,8 @@ def train_and_test_model(config):
         train_losses.append(train_loss)
         if best_train_loss > train_loss:
             best_train_loss = train_loss
-        print(f"epoch {epoch} train loss: {train_loss}")
+        if trainer.is_main_process():
+            print(f"epoch {epoch} train loss: {train_loss}")
         if epoch % config["save_epochs"] == 0:
             trainer.save_model(os.path.join(result_path, f'best_model.pth'))
             torch.cuda.empty_cache()
@@ -74,9 +84,10 @@ def train_and_test_model(config):
     plt.legend()
     plt.savefig(os.path.join(result_path, "train_loss.png"))
     plt.close()
-    #plt.show()
-    with open(os.path.join(result_path, "train_loss.txt"),'w') as f:
-        f.write(str(train_losses))
+    #plt.show
+    if trainer.is_main_process():
+        with open(os.path.join(result_path, "train_loss.txt"),'w') as f:
+            f.write(str(train_losses))
 
     # 测试阶段
     trainer.load_model(os.path.join(result_path, "best_model.pth"))
@@ -90,6 +101,7 @@ def train_and_test_model(config):
         batch_label = batch_label.to(device)
         pred = trainer.model.generate(batch_data)
         loss = criterion(pred, batch_label)
+        loss = trainer.reduce_loss(loss)
         correct_counts = [s+c for s,c in zip(correct_counts, get_correct(pred, batch_label))]
         test_loss += loss.item() * batch_data.shape[0]
         end_time = time.time()
@@ -99,20 +111,25 @@ def train_and_test_model(config):
     total_len = len(test_loader.dataset)
     test_loss /= total_len
     accuracy = [x / total_len for x in correct_counts]
+    accuracy = trainer.reduce_loss(accuracy)
     total_accuracy = sum(accuracy) / config['pred_steps']
-    print(f"test loss：{test_loss:.6f}")
-    print(accuracy)
-    print(f"total accuracy {total_accuracy}")
+    if trainer.is_main_process():
+        print(f"test loss：{test_loss:.6f}")
+        print(accuracy)
+        print(f"total accuracy {total_accuracy}")
     total_params = sum(p.numel() for p in trainer.model.parameters())
     ave_runtime = times / len(test_loader.dataset)
     informations = config.get_all_values() + [total_params, ave_runtime, best_train_loss, test_loss, total_accuracy]
     informations = pd.DataFrame([informations], columns=(list(config.get_all_keys())+
                                                   ['param_sum','ave_runtime','best_train_loss','test_loss','test_accuracy']))
     full_test_results = pd.concat([full_test_results, informations],ignore_index=True)
-    print(full_test_results)
+    if trainer.is_main_process():
+        print(full_test_results)
     full_test_results.to_csv(test_result_path, index=False)
-    with open(os.path.join(result_path, "accuracy.txt"),'w') as f:
-        f.write(str(accuracy))
+    if trainer.is_main_process():
+        with open(os.path.join(result_path, "accuracy.txt"),'w') as f:
+            f.write(str(accuracy))
+    trainer.cleanup()
     return test_loss, total_accuracy
 
 

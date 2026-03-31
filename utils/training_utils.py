@@ -41,6 +41,7 @@ class DistributedTrainer:
             self._init_ddp()
         self.model = self._prepare_model(config)
 
+
     def _init_ddp(self):
         '''
         self.world_size = self.num_gpus
@@ -70,6 +71,7 @@ class DistributedTrainer:
             rank=self.rank,
             world_size=self.world_size
         )
+        dist.barrier()
         torch.cuda.set_device(self.rank)
 
     def _prepare_model(self, config):
@@ -77,10 +79,15 @@ class DistributedTrainer:
             model = Transformer(config)
         else:
             print('invalid model')
-            return None, None, None
+            return None
         if self.use_ddp:
+            if self.rank == 0:
+                torch.save(model.state_dict(), "tmp.pth")
+            dist.barrier()
+            model.load_state_dict(torch.load("tmp.pth", map_location=self.get_device()))
             model = DDP(model, device_ids=[self.rank])
         model = model.to(self.get_device())
+
         return model
 
     def get_dataloader(self, dataset, batch_size, shuffle=True, drop_last=False):
@@ -116,19 +123,12 @@ class DistributedTrainer:
             return torch.device('cuda')
 
     def save_model(self, path):
-        if self.use_ddp:
-            state_dict = self.model.module.state_dict()
-        else:
-            state_dict = self.model.state_dict()
-
+        state_dict = self.model.state_dict()
         torch.save(state_dict, path)
 
     def load_model(self, path):
         state_dict = torch.load(path)
-        if self.use_ddp:
-            self.model.module.load_state_dict(state_dict)
-        else:
-            self.model.load_state_dict(state_dict)
+        self.model.load_state_dict(state_dict)
 
     def is_main_process(self):
         return self.rank == 0
@@ -136,3 +136,14 @@ class DistributedTrainer:
     def cleanup(self):
         if self.use_ddp and dist.is_initialized():
             dist.destroy_process_group()
+        if os.path.exists("tmp.pth"):
+            os.remove("tmp.pth")
+
+    def reduce_loss(self, loss, average=True):
+        if self.world_size < 2:
+            return loss
+        with torch.no_grad():
+            dist.all_reduce(loss)
+            if average:
+                loss = loss / self.world_size
+            return loss

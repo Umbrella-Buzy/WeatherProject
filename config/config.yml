@@ -17,6 +17,7 @@ Global:
   device : auto
   dropout: 0.1
   learning_rate: 0.0001
+  weight_decay: 0.005
   epochs: 25
   save_epochs: 1
   max_grad_norm: 1.0
