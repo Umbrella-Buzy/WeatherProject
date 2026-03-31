@@ -58,6 +58,8 @@ def train_and_test_model(config):
 
         train_loss /= len(train_loader.dataset)
         train_losses.append(train_loss)
+        if best_train_loss > train_loss:
+            best_train_loss = train_loss
         print(f"epoch {epoch} train loss: {train_loss}")
         if epoch % config["save_epochs"] == 0:
             trainer.save_model(os.path.join(result_path, f'best_model.pth'))

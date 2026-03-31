@@ -29,18 +29,18 @@ class WeatherDataset(Dataset):
                     dec_inputs.append(dec[j])
                     labels.append(label[j])
 
-        '''
-        train_split = int(len(samples) * self.config["train_ratio"])
-        if self.mode == "train":
-            return samples[:train_split], dec_inputs[:train_split], labels[:train_split]
+        if self.config["mode"] != "debug":
+            train_split = int(len(samples) * self.config["train_ratio"])
+            if self.mode == "train":
+                return samples[:train_split], dec_inputs[:train_split], labels[:train_split]
+            else:
+                return samples[train_split:], dec_inputs[train_split:], labels[train_split:]
         else:
-            return samples[train_split:], dec_inputs[train_split:], labels[train_split:]
-        '''
-        train_split = int(len(samples) * 0.05)
-        if self.mode == "train":
-            return samples[:train_split], dec_inputs[:train_split], labels[:train_split]
-        else:
-            return samples[-train_split:], dec_inputs[-train_split:], labels[-train_split:]
+            train_split = int(len(samples) * 0.05)
+            if self.mode == "train":
+                return samples[:train_split], dec_inputs[:train_split], labels[:train_split]
+            else:
+                return samples[-train_split:], dec_inputs[-train_split:], labels[-train_split:]
 
     def __len__(self):
         return len(self.data)

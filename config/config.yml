@@ -4,25 +4,27 @@ Global:
   result_path: "./results/"
   features: 12
   out_features: 6
-  time_steps: 6
-  max_steps: 6
-  pred_steps: 6
+  time_steps: 72
+  max_steps: 24
+  pred_steps: 24
   batch_size: 16
   train_ratio: 0.7
   test_ratio: 0.3
-  experiment_rounds : 1
+  patience: 5
+  experiment_rounds : 2
+  mode: train
 
   device : auto
   dropout: 0.1
   learning_rate: 0.0001
-  epochs: 2
+  epochs: 25
   save_epochs: 1
   max_grad_norm: 1.0
 
 Transformer:
   pre_processing: time_space_emb
-  enc_layers: 2
-  dec_layers: 2
-  model_dim: 16
-  num_heads: 4
-  head_dim: 4
+  enc_layers: 6
+  dec_layers: 6
+  model_dim: 512
+  num_heads: 8
+  head_dim: 64
