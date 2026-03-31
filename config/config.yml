@@ -4,9 +4,9 @@ Global:
   result_path: "./results/"
   features: 12
   out_features: 6
-  time_steps: 24
-  max_steps: 24
-  pred_steps: 24
+  time_steps: 6
+  max_steps: 6
+  pred_steps: 6
   batch_size: 16
   train_ratio: 0.7
   test_ratio: 0.3
@@ -15,7 +15,7 @@ Global:
   device : auto
   dropout: 0.1
   learning_rate: 0.0001
-  epochs: 1
+  epochs: 2
   save_epochs: 1
   max_grad_norm: 1.0
 

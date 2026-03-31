@@ -13,6 +13,8 @@ from utils.data_process import *
 from utils.training_utils import *
 import matplotlib.pyplot as plt
 
+#os.environ['MASTER_ADDR'] = 'localhost'
+#os.environ['MASTER_PORT'] = '8800'
 config = Config("./config/config.yml")
 
 # ===================== 数据读取与预处理=====================
@@ -59,7 +61,9 @@ def train_and_test_model(config):
         print(f"epoch {epoch} train loss: {train_loss}")
         if epoch % config["save_epochs"] == 0:
             trainer.save_model(os.path.join(result_path, f'best_model.pth'))
+            torch.cuda.empty_cache()
     trainer.save_model(os.path.join(result_path, f'best_model.pth'))
+    torch.cuda.empty_cache()
 
     plt.title = 'train loss'
     plt.xlabel('epoch')
