@@ -12,7 +12,7 @@ Global:
   test_ratio: 0.3
   patience: 5
   experiment_rounds : 2
-  mode: train
+  mode: debug
 
   device : auto
   dropout: 0.1

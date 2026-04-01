@@ -28,7 +28,6 @@ def init_results(config):
 
 class DistributedTrainer:
     def __init__(self, config, use_ddp=None):
-        print("initializing distributed trainer...")
         self.num_gpus = torch.cuda.device_count()
         if use_ddp is None:
             self.use_ddp = self.num_gpus > 1
@@ -37,7 +36,7 @@ class DistributedTrainer:
         self.rank = 0
         self.world_size = 1
         if self.use_ddp:
-            print("begin init ddp")
+            print("begin initializing ddp")
             self._init_ddp()
         self.model = self._prepare_model(config)
 
@@ -47,8 +46,8 @@ class DistributedTrainer:
         self.world_size = self.num_gpus
         self.rank = int(os.environ.get('LOCAL_RANK', 0))
         store = dist.TCPStore(
-            "localhost",
-            8800,
+            "127.0.0.1",
+            29500,
             is_master=self.is_main_process(),
             timeout=timedelta(seconds=30),
             use_libuv=False
@@ -85,8 +84,9 @@ class DistributedTrainer:
                 torch.save(model.state_dict(), "tmp.pth")
             dist.barrier()
             model.load_state_dict(torch.load("tmp.pth", map_location=self.get_device()))
-            model = DDP(model, device_ids=[self.rank])
         model = model.to(self.get_device())
+        if self.use_ddp:
+            model = DDP(model, device_ids=[self.rank], find_unused_parameters=False)
 
         return model
 
@@ -103,6 +103,7 @@ class DistributedTrainer:
                 batch_size=batch_size,
                 sampler=sampler,
                 pin_memory=True,
+                num_workers=0,
                 drop_last=drop_last
             )
         else:
@@ -111,6 +112,7 @@ class DistributedTrainer:
                 batch_size=batch_size,
                 shuffle=shuffle,
                 pin_memory=True,
+                num_workers=0,
                 drop_last=drop_last
             )
 
@@ -122,9 +124,10 @@ class DistributedTrainer:
         else:
             return torch.device('cuda')
 
-    def save_model(self, path):
-        state_dict = self.model.state_dict()
-        torch.save(state_dict, path)
+    def save_model(self, path, all_device=False):
+        if all_device or self.is_main_process():
+            state_dict = self.model.state_dict()
+            torch.save(state_dict, path)
 
     def load_model(self, path):
         state_dict = torch.load(path)

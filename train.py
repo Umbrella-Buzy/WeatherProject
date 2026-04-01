@@ -5,6 +5,7 @@ import torch.optim as optim
 import pandas as pd
 from sympy.physics.units import momentum
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.distributed import DistributedSampler
 import os
 from tqdm import tqdm
 import time
@@ -14,6 +15,7 @@ from utils.data_process import *
 from utils.training_utils import *
 import matplotlib.pyplot as plt
 
+os.environ["USE_LIBUV"] = "0"
 #os.environ['MASTER_ADDR'] = 'localhost'
 #os.environ['MASTER_PORT'] = '8800'
 os.environ["USE_LIBUV"] = "0"
@@ -21,7 +23,7 @@ config = Config("./config/config.yml")
 
 # ===================== 数据读取与预处理=====================
 # 构建数据集和数据加载器
-trainer = DistributedTrainer(config)
+trainer = DistributedTrainer(config, )
 device = trainer.get_device()
 
 train_dataset = WeatherDataset(config, mode="train")
@@ -45,11 +47,15 @@ def train_and_test_model(config):
     if trainer.is_main_process():
         print(f"begin training on {device}...")
     for epoch in range(config["epochs"]):
+        if hasattr(train_loader, 'sampler') and isinstance(train_loader.sampler, DistributedSampler):
+            train_loader.sampler.set_epoch(epoch)
+
         trainer.model.train()
         train_loss = 0.0
+        m_train_loader = train_loader
         if trainer.is_main_process():
-            train_loader = tqdm(train_loader)
-        for batch_data, batch_dec_input, batch_label in train_loader:
+            m_train_loader = tqdm(m_train_loader)
+        for _, (batch_data, batch_dec_input, batch_label) in enumerate(m_train_loader):
             batch_data = batch_data.to(device)
             batch_dec_input = batch_dec_input.to(device)
             batch_label = batch_label.to(device)
@@ -58,12 +64,12 @@ def train_and_test_model(config):
             pred = trainer.model(batch_data, batch_dec_input)
             loss = criterion(pred, batch_label)
             loss.backward()
-            loss = trainer.reduce_loss(loss)
+            #loss = trainer.reduce_loss(loss)
 
             torch.nn.utils.clip_grad_norm_(trainer.model.parameters(), config["max_grad_norm"])
             optimizer.step()
 
-            train_loss += loss.item() * batch_data.shape[0]
+            #train_loss += loss.item() * batch_data.shape[0]
 
         train_loss /= len(train_loader.dataset)
         train_losses.append(train_loss)
@@ -95,7 +101,7 @@ def train_and_test_model(config):
     test_loss = 0
     times = 0
     correct_counts = [0] * config['pred_steps']
-    for batch_data, _, batch_label in tqdm(test_loader):
+    for _, (batch_data, _, batch_label) in enumerate(test_loader):
         start_time = time.time()
         batch_data = batch_data.to(device)
         batch_label = batch_label.to(device)
