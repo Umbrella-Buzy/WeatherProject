@@ -70,7 +70,7 @@ class Transformer(nn.Module):
         return out
 
     def generate(self, x):
-        dec_input = x[:, -1, 6:].unsqueeze(1)
+        dec_input = x[:, -1, (-self.config["out_features"]):].unsqueeze(1)
         x = self.enc_input_proj(x)
         x = self.pos_encoder(x)
         for encoder_block in self.encoder:

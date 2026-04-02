@@ -11,7 +11,7 @@ Global:
   train_ratio: 0.7
   test_ratio: 0.3
   patience: 5
-  experiment_rounds : 2
+  experiment_rounds : 1
   mode: debug
 
   device : auto

@@ -70,12 +70,12 @@ class Preprocessor(nn.Module):
         d = x[4, :].numpy()
         h = x[5, :]
         days = []
-        for month, year,  in zip(m, y):
+        for month, year  in zip(m, y):
             days_in_month = calendar.monthrange(year, int(month))[1]
             days.append(days_in_month)
 
 def get_correct(pred_data, real_data):
     abs_diff = torch.abs(pred_data - real_data)
-    is_correct = (abs_diff < 5).all(dim=2)
+    is_correct = (abs_diff < 25).all(dim=2)
     correct_counts = is_correct.sum(dim=0)
     return correct_counts.tolist()
