@@ -137,12 +137,14 @@ def train_and_test_model(config):
     trainer.cleanup()
     return test_loss, total_accuracy
 
-def test():
+def modeltest():
     trainer.load_model(os.path.join("./results/Transformer/test_4/", "best_model.pth"))
     trainer.model.eval()
     test_loss = 0
     times = 0
     correct_counts = [0] * config['pred_steps']
+    record_label = None
+    record_prediction = None
     for batch_data, batch_dec_input, batch_label in tqdm(test_loader):
         start_time = time.time()
         batch_data = batch_data.to(device)
@@ -150,6 +152,8 @@ def test():
         batch_label = batch_label.to(device)
         pred = trainer.model.generate(batch_data)
         #pred = trainer.model(batch_data, batch_dec_input)
+        record_label = batch_label[0]
+        record_prediction = pred[0]
         loss = criterion(pred, batch_label)
         loss = trainer.reduce_loss(loss)
         correct_counts = [s + c for s, c in zip(correct_counts, get_correct(pred, batch_label))]
@@ -163,6 +167,8 @@ def test():
     accuracy = [x / total_len for x in correct_counts]
     accuracy = trainer.reduce_loss(accuracy)
     total_accuracy = sum(accuracy) / config['pred_steps']
+    print(record_prediction)
+    print(record_label)
     if trainer.is_main_process():
         print(f"test loss：{test_loss:.6f}")
         print(accuracy)
@@ -171,6 +177,7 @@ def test():
 
 # ===================== 主函数执行=====================
 if __name__ == "__main__":
+    '''
     test_losses = []
     test_accuracies = []
     for i in range(config['experiment_rounds']):
@@ -181,5 +188,4 @@ if __name__ == "__main__":
         print(f'experiment_round: {i} : test_loss: {test_losses[i]:6f}, test_accuracy: {test_accuracies[i]:6f}')
     print(f'average : test_loss: {np.mean(test_losses)}, test_accuracy: {np.mean(test_accuracies)}')
     '''
-    test()
-    '''
+    modeltest()

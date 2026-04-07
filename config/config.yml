@@ -1,8 +1,8 @@
 Global:
-  model : Transformer
+  model : DirectTransformer
   data_path: "./data/"
   result_path: "./results/"
-  features: 12
+  features: 11
   out_features: 6
   time_steps: 72
   max_steps: 24
@@ -12,20 +12,28 @@ Global:
   test_ratio: 0.3
   patience: 5
   experiment_rounds : 1
-  mode: debug
+  mode: train
 
   device : auto
   dropout: 0.1
   learning_rate: 0.0001
+  min_lr: 0.000001
   weight_decay: 0.005
   epochs: 25
   save_epochs: 1
   max_grad_norm: 1.0
 
 Transformer:
-  pre_processing: time_space_emb
+  pre_processing: normalize
   enc_layers: 6
   dec_layers: 6
+  model_dim: 512
+  num_heads: 8
+  head_dim: 64
+
+DirectTransformer:
+  pre_processing: normalize
+  layers: 12
   model_dim: 512
   num_heads: 8
   head_dim: 64

@@ -9,9 +9,9 @@ class EncoderBlock(nn.Module):
         self.norm2 = nn.LayerNorm(model_dim)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         residual = x
-        x = self.attention(self.norm1(x))
+        x = self.attention(self.norm1(x), mask=mask)
         x = self.dropout(x) + residual
         residual = x
         x = self.ffn(self.norm2(x))
@@ -87,7 +87,28 @@ class Transformer(nn.Module):
             dec_input = torch.cat((dec_input, next_step), dim=1)
         return dec_input[:, 1:, :]
 
+class DirectTransformer(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.input_proj = nn.Linear(config['features'], config['model_dim'])
+        self.output_proj = nn.Linear(config['model_dim'], config['out_features'])
+        self.pos_encoder = PositionalEncoding(config['model_dim'], config['dropout'])
+        self.AttentionBlocks = nn.ModuleList([EncoderBlock(config['model_dim'], config['num_heads'], config['head_dim'], config['dropout'])
+                                              for _ in range(config['layers'])])
+        self.pooling = nn.AdaptiveAvgPool1d(self.config['pred_steps'])
 
+    def forward(self, x, placeholder):
+        x = self.input_proj(x)
+        x = self.pos_encoder(x)
+        for encoder_block in self.AttentionBlocks:
+            x = encoder_block(x)
+        x = self.pooling(x.transpose(1, 2)).transpose(1, 2)
+        x = self.output_proj(x)
+        return x
+
+    def generate(self, x):
+        return self.forward(x, None)
 
 
 

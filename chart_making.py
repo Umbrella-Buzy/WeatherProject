@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import os
-from utils import Config
+import ast
+from utils.config import Config
 
 config = Config("./config/config.yml")
 result_path = config["result_path"]
@@ -83,6 +84,4 @@ def result_loss_chart():
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.show()
 
-training_loss_chart()
-result_loss_chart()
 

@@ -6,24 +6,18 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 from models.Transformer import Transformer
 from datetime import timedelta
+from datetime import datetime
 import pandas as pd
 
 def init_results(config):
+    now = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     result_path = os.path.join(config["result_path"], f'{config["model"]}/')
     if not os.path.exists(result_path):
         os.makedirs(result_path)
-    test_result_path = os.path.join(result_path, "test_results.csv")
-    if not os.path.exists(test_result_path):
-        full_test_results = pd.DataFrame(columns=(list(config.get_all_keys())+
-                                                  ['param_sum','ave_runtime','best_train_loss','test_loss','test_accuracy']))
-        test_id = 0
-    else:
-        full_test_results = pd.read_csv(test_result_path)
-        test_id = full_test_results.shape[0]
-    result_path = os.path.join(result_path, f'test_{test_id}/')
+    result_path = os.path.join(result_path, f'{now}-{config["device"]}/')
     if not os.path.exists(result_path):
         os.makedirs(result_path)
-    return full_test_results, test_id, result_path, test_result_path
+    return result_path
 
 
 class DistributedTrainer:
